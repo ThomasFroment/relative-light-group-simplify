@@ -1,9 +1,9 @@
 {
-  "domain": "relative_light_group",
-  "name": "Relative Light Group",
-  "codeowners": ["@Cheerpipe"],
+  "domain": "relative_light_group_simplified",
+  "name": "Relative Light Group Simplified",
+  "codeowners": ["@ThomasFroment"],
   "config_flow": true,
-  "documentation": "https://github.com/Cheerpipe/relative-light-group",
+  "documentation": "https://github.com/ThomasFroment/relative-light-group-simplify.git",
   "integration_type": "helper",
   "iot_class": "calculated",
   "version": "1.0.0"
