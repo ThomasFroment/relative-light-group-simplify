@@ -180,7 +180,7 @@ CONFIG_FLOW = {
     "user": SchemaFlowFormStep(
         LIGHT_CONFIG_SCHEMA,
         validate_user_input=_async_validate_entities,
-        preview="relative_light_group",
+        preview="relative_light_group_simplified",
     ),
 }
 
@@ -188,7 +188,7 @@ OPTIONS_FLOW = {
     "init": SchemaFlowFormStep(
         light_options_schema,
         validate_user_input=_async_validate_entities,
-        preview="relative_light_group",
+        preview="relative_light_group_simplified",
     ),
 }
 
@@ -230,7 +230,7 @@ class RelativeLightGroupConfigFlowHandler(SchemaConfigFlowHandler, domain=DOMAIN
 
 @websocket_api.websocket_command(
     {
-        vol.Required("type"): "relative_light_group/start_preview",
+        vol.Required("type"): "relative_light_group_simplified/start_preview",
         vol.Required("flow_id"): str,
         vol.Required("flow_type"): vol.Any("config_flow", "options_flow"),
         vol.Required("user_input"): dict,

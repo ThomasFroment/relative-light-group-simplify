@@ -35,7 +35,7 @@ Unlike standard light groups, this integration maintains the relative brightness
 
 ### Manual
 
-1. Copy the `custom_components/relative_light_group` folder to your Home Assistant `config/custom_components/` directory
+1. Copy the `custom_components/relative_light_group_simplified` folder to your Home Assistant `config/custom_components/` directory
 2. Restart Home Assistant
 
 ## Configuration

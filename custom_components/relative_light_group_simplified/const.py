@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-DOMAIN = "relative_light_group"
+DOMAIN = "relative_light_group_simplified"
 
 # Easy 1-line toggles for personal preferences:
 DEFAULT_REMEMBER_ON_STATE = False  # Set to True to only turn on previously active lights
