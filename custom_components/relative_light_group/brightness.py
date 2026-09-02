@@ -2,17 +2,8 @@
 
 from __future__ import annotations
 
-from statistics import median
-
 from homeassistant.core import State
 
-from .const import (
-    BRIGHTNESS_STRATEGY_AVERAGE,
-    BRIGHTNESS_STRATEGY_MAX,
-    BRIGHTNESS_STRATEGY_MEDIAN,
-    BRIGHTNESS_STRATEGY_MIN,
-    DEFAULT_BRIGHTNESS_STRATEGY,
-)
 from .util import coerce_in
 
 BRIGHTNESS_MAX = 255
@@ -33,62 +24,12 @@ def brightness_values(states: list[State], attribute: str) -> list[int]:
 def representative_brightness(
     states: list[State],
     attribute: str,
-    strategy: str = DEFAULT_BRIGHTNESS_STRATEGY,
 ) -> int | None:
-    """Calculate the brightness value reported by the group."""
+    """Calculate the average brightness value reported by the group."""
     values = brightness_values(states, attribute)
     if not values:
         return None
-
-    if strategy == BRIGHTNESS_STRATEGY_MEDIAN:
-        return int(median(values))
-    if strategy == BRIGHTNESS_STRATEGY_MAX:
-        return max(values)
-    if strategy == BRIGHTNESS_STRATEGY_MIN:
-        return min(values)
-
     return int(sum(values) / len(values))
-
-
-def relative_brightness_map(
-    states: list[State],
-    current_group_brightness: int,
-    target_group_brightness: int,
-    attribute: str,
-) -> dict[str, int]:
-    """Calculate standard relative brightness targets for member lights."""
-    if current_group_brightness <= 0:
-        return {}
-
-    brightness_change = target_group_brightness - current_group_brightness
-    if brightness_change == 0:
-        return {}
-
-    if brightness_change > 0:
-        denominator = BRIGHTNESS_MAX - current_group_brightness
-    else:
-        denominator = current_group_brightness
-    if denominator <= 0:
-        return {}
-
-    brightness_change_factor = brightness_change / denominator
-    brightness_map: dict[str, int] = {}
-
-    for state in states:
-        light_brightness = state.attributes.get(attribute)
-        if light_brightness is None:
-            brightness_map[state.entity_id] = target_group_brightness
-            continue
-
-        if brightness_change > 0:
-            offset = brightness_change_factor * (BRIGHTNESS_MAX - light_brightness)
-        else:
-            offset = brightness_change_factor * light_brightness
-        brightness_map[state.entity_id] = coerce_in(
-            round(light_brightness + offset), BRIGHTNESS_MIN, BRIGHTNESS_MAX
-        )
-
-    return brightness_map
 
 
 def base_relative_brightness_map(
@@ -146,3 +87,4 @@ def group_entity_ids_by_brightness(
     for entity_id, brightness in brightness_map.items():
         groups.setdefault(brightness, []).append(entity_id)
     return groups
+

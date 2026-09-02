@@ -65,22 +65,14 @@ from .brightness import (
     BRIGHTNESS_MIN,
     base_relative_brightness_map,
     group_entity_ids_by_brightness,
-    relative_brightness_map,
     representative_brightness,
 )
 from .const import (
-    CONF_ALL,
-    CONF_BRIGHTNESS_STRATEGY,
-    CONF_DEBOUNCE_ENABLED,
-    CONF_DEBOUNCE_TIME,
-    CONF_MEMBER_DIAGNOSTICS,
-    CONF_REMEMBER_BRIGHTNESS,
-    CONF_REMEMBER_ON_STATE,
-    CONF_RESTORE_INDIVIDUAL_BRIGHTNESS,
-    DEFAULT_BRIGHTNESS_STRATEGY,
     DEFAULT_DEBOUNCE_ENABLED,
     DEFAULT_DEBOUNCE_TIME,
-    DEFAULT_MEMBER_DIAGNOSTICS,
+    DEFAULT_REMEMBER_BRIGHTNESS,
+    DEFAULT_REMEMBER_ON_STATE,
+    DEFAULT_RESTORE_INDIVIDUAL_BRIGHTNESS,
 )
 from .entity import GroupEntity
 from .util import (
@@ -171,22 +163,6 @@ async def async_setup_entry(
     entities = er.async_validate_entity_ids(
         registry, config_entry.options[CONF_ENTITIES]
     )
-    mode = config_entry.options.get(CONF_ALL, False)
-    remember_on_state = config_entry.options.get(CONF_REMEMBER_ON_STATE, False)
-    restore_individual_brightness = config_entry.options.get(
-        CONF_RESTORE_INDIVIDUAL_BRIGHTNESS, False
-    )
-    remember_brightness = config_entry.options.get(CONF_REMEMBER_BRIGHTNESS, False)
-    debounce_enabled = config_entry.options.get(
-        CONF_DEBOUNCE_ENABLED, DEFAULT_DEBOUNCE_ENABLED
-    )
-    debounce_time = config_entry.options.get(CONF_DEBOUNCE_TIME, DEFAULT_DEBOUNCE_TIME)
-    brightness_strategy = config_entry.options.get(
-        CONF_BRIGHTNESS_STRATEGY, DEFAULT_BRIGHTNESS_STRATEGY
-    )
-    member_diagnostics = config_entry.options.get(
-        CONF_MEMBER_DIAGNOSTICS, DEFAULT_MEMBER_DIAGNOSTICS
-    )
 
     async_add_entities(
         [
@@ -194,14 +170,6 @@ async def async_setup_entry(
                 config_entry.entry_id,
                 config_entry.title,
                 entities,
-                mode,
-                remember_on_state,
-                restore_individual_brightness,
-                remember_brightness,
-                debounce_enabled,
-                debounce_time,
-                brightness_strategy,
-                member_diagnostics,
             )
         ]
     )
@@ -216,14 +184,6 @@ def async_create_preview_light(
         None,
         name,
         validated_config[CONF_ENTITIES],
-        validated_config.get(CONF_ALL, False),
-        validated_config.get(CONF_REMEMBER_ON_STATE, False),
-        validated_config.get(CONF_RESTORE_INDIVIDUAL_BRIGHTNESS, False),
-        validated_config.get(CONF_REMEMBER_BRIGHTNESS, False),
-        validated_config.get(CONF_DEBOUNCE_ENABLED, DEFAULT_DEBOUNCE_ENABLED),
-        validated_config.get(CONF_DEBOUNCE_TIME, DEFAULT_DEBOUNCE_TIME),
-        validated_config.get(CONF_BRIGHTNESS_STRATEGY, DEFAULT_BRIGHTNESS_STRATEGY),
-        validated_config.get(CONF_MEMBER_DIAGNOSTICS, DEFAULT_MEMBER_DIAGNOSTICS),
     )
 
 
@@ -233,10 +193,7 @@ class RelativeLightGroup(GroupEntity, LightEntity):
     Brightness changes are distributed proportionally among on lights.
     Color/effect changes are forwarded only to on lights.
     Turn on/off affects all lights (with optional remember behavior).
-    When remember_brightness is enabled, base brightness ratios are preserved
-    even after hitting brightness limits (0% or 100%).
-    When restore_individual_brightness is enabled, turning the group off stores
-    each on member's brightness; turning the group back on reapplies it.
+    Base brightness ratios are preserved even after hitting brightness limits.
     """
 
     _attr_available = False
@@ -250,14 +207,6 @@ class RelativeLightGroup(GroupEntity, LightEntity):
         unique_id: str | None,
         name: str,
         entity_ids: list[str],
-        mode: bool | None,
-        remember_on_state: bool,
-        restore_individual_brightness: bool,
-        remember_brightness: bool,
-        debounce_enabled: bool,
-        debounce_time: int,
-        brightness_strategy: str,
-        member_diagnostics: bool,
     ) -> None:
         """Initialize a relative light group."""
         self._entity_ids = entity_ids
@@ -265,28 +214,24 @@ class RelativeLightGroup(GroupEntity, LightEntity):
         self._attr_extra_state_attributes = {ATTR_ENTITY_ID: entity_ids}
         self._attr_unique_id = unique_id
         self.mode = any
-        if mode:
-            self.mode = all
 
-        self._remember_on_state = remember_on_state
+        self._remember_on_state = DEFAULT_REMEMBER_ON_STATE
         self._remembered_lights: list[str] | None = None
         self._remembered_lights_consistent = False
 
-        self._restore_individual_brightness = restore_individual_brightness
+        self._restore_individual_brightness = DEFAULT_RESTORE_INDIVIDUAL_BRIGHTNESS
         self._remembered_brightness: dict[str, int] = {}
         self._remembered_brightness_consistent = False
 
-        self._remember_brightness = remember_brightness
+        self._remember_brightness = DEFAULT_REMEMBER_BRIGHTNESS
         self._base_brightness: dict[str, int] = {}
         self._last_command_contexts: deque[str] = deque(maxlen=50)
 
-        self._debounce_enabled = debounce_enabled
-        self._debounce_time = debounce_time
+        self._debounce_enabled = DEFAULT_DEBOUNCE_ENABLED
+        self._debounce_time = DEFAULT_DEBOUNCE_TIME
         self._last_command_time = 0.0
         self._last_command_debounce_eligible = False
         self._debounce_sync_unsub: CALLBACK_TYPE | None = None
-        self._brightness_strategy = brightness_strategy
-        self._member_diagnostics = member_diagnostics
 
         self._attr_color_mode = ColorMode.UNKNOWN
         self._attr_supported_color_modes = {ColorMode.ONOFF}
@@ -605,10 +550,6 @@ class RelativeLightGroup(GroupEntity, LightEntity):
     @callback
     def _async_write_optimistic_state(self) -> None:
         """Publish the optimistic group state immediately."""
-        if self._member_diagnostics:
-            self._attr_extra_state_attributes = self._build_extra_state_attributes(
-                self._get_member_snapshot()
-            )
         if self.hass.is_running:
             self.async_write_ha_state()
 
@@ -674,59 +615,6 @@ class RelativeLightGroup(GroupEntity, LightEntity):
 
         self._async_schedule_post_command_sync()
         return True
-
-    @callback
-    def _is_debounce_active(self) -> bool:
-        """Return True while a group-originated debounce window is active."""
-        return (
-            self._last_command_debounce_eligible
-            and self._debounce_enabled
-            and self._debounce_time > 0
-            and time.monotonic() - self._last_command_time < self._debounce_time / 1000
-        )
-
-    @callback
-    def _build_extra_state_attributes(
-        self, snapshot: MemberStateSnapshot
-    ) -> dict[str, Any]:
-        """Build group attributes, adding member diagnostics only when requested."""
-        attributes: dict[str, Any] = {ATTR_ENTITY_ID: self._entity_ids}
-        if not self._member_diagnostics:
-            return attributes
-
-        member_states: dict[str, str] = {}
-        state_by_id = {state.entity_id: state for state in snapshot.enabled_states}
-        for entity_id in self._entity_ids:
-            if entity_id in snapshot.disabled_entity_ids:
-                member_states[entity_id] = "disabled"
-            elif entity_id in snapshot.missing_entity_ids:
-                member_states[entity_id] = "missing"
-            elif (state := state_by_id.get(entity_id)) is not None:
-                member_states[entity_id] = state.state
-            else:
-                member_states[entity_id] = "missing"
-
-        member_brightness = {
-            state.entity_id: int(brightness)
-            for state in snapshot.enabled_states
-            if (brightness := state.attributes.get(ATTR_BRIGHTNESS)) is not None
-        }
-
-        attributes.update(
-            {
-                "member_states": member_states,
-                "member_brightness": member_brightness,
-                "remembered_on_members": self._remembered_lights or [],
-                "remembered_on_members_consistent": self._remembered_lights_consistent,
-                "remembered_brightness": dict(self._remembered_brightness),
-                "remembered_brightness_consistent": (
-                    self._remembered_brightness_consistent
-                ),
-                CONF_BRIGHTNESS_STRATEGY: self._brightness_strategy,
-                "debounce_active": self._is_debounce_active(),
-            }
-        )
-        return attributes
 
     def _get_on_lights(self) -> list:
         """Get list of currently on light states."""
@@ -933,15 +821,9 @@ class RelativeLightGroup(GroupEntity, LightEntity):
 
             # Case 2: Group is ON and brightness is being changed
             if has_brightness and on_lights:
-                if self._remember_brightness:
-                    # Use base-relative algorithm (preserves ratios)
-                    await self._apply_brightness_with_base(
-                        data, on_lights, data[ATTR_BRIGHTNESS]
-                    )
-
-                else:
-                    # Standard relative algorithm
-                    await self._apply_relative_brightness(data, on_lights)
+                await self._apply_brightness_with_base(
+                    data, on_lights, data[ATTR_BRIGHTNESS]
+                )
                 return
 
             # Case 3: Group is ON, no brightness change, but visual attributes
@@ -976,57 +858,6 @@ class RelativeLightGroup(GroupEntity, LightEntity):
                 self._async_schedule_post_command_sync()
             else:
                 self._async_sync_group_state(ignore_debounce=True)
-
-    async def _apply_relative_brightness(
-        self, data: dict[str, Any], on_lights: list
-    ) -> None:
-        """Apply standard relative brightness algorithm (oscarb-style)."""
-        group_brightness_current = self._attr_brightness
-        if group_brightness_current is None or group_brightness_current <= 0:
-            return
-
-        group_brightness_new = data[ATTR_BRIGHTNESS]
-        brightness_map = relative_brightness_map(
-            on_lights,
-            group_brightness_current,
-            group_brightness_new,
-            ATTR_BRIGHTNESS,
-        )
-
-        visual_data = {
-            key: value for key, value in data.items() if key in VISUAL_ATTRIBUTES
-        }
-
-        if brightness_map:
-            errors: list[HomeAssistantError] = []
-            success_count = 0
-            for brightness, entity_ids in group_entity_ids_by_brightness(
-                brightness_map
-            ).items():
-                call_data = {**visual_data}
-                call_data[ATTR_BRIGHTNESS] = brightness
-                call_data[ATTR_ENTITY_ID] = entity_ids
-                if ATTR_TRANSITION in data:
-                    call_data[ATTR_TRANSITION] = data[ATTR_TRANSITION]
-
-                _LOGGER.debug("Relative brightness call: %s", call_data)
-
-                if err := await self._async_call_light_service(
-                    SERVICE_TURN_ON, call_data
-                ):
-                    errors.append(err)
-                else:
-                    success_count += 1
-            self._raise_if_all_light_service_calls_failed(errors, success_count)
-        elif visual_data:
-            on_entity_ids = [state.entity_id for state in on_lights]
-            call_data = {**visual_data}
-            call_data[ATTR_ENTITY_ID] = on_entity_ids
-            if ATTR_TRANSITION in data:
-                call_data[ATTR_TRANSITION] = data[ATTR_TRANSITION]
-
-            if err := await self._async_call_light_service(SERVICE_TURN_ON, call_data):
-                raise err
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Forward the turn_off command to all lights in the light group."""
@@ -1093,9 +924,9 @@ class RelativeLightGroup(GroupEntity, LightEntity):
                 state.state != STATE_UNAVAILABLE for state in snapshot.enabled_states
             )
 
-        # Brightness is calculated only from ON lights using the configured strategy.
+        # Brightness is calculated only from ON lights using average.
         self._attr_brightness = representative_brightness(
-            on_states, ATTR_BRIGHTNESS, self._brightness_strategy
+            on_states, ATTR_BRIGHTNESS
         )
         self._seed_runtime_state_from_members(snapshot)
 
@@ -1189,7 +1020,5 @@ class RelativeLightGroup(GroupEntity, LightEntity):
             self._attr_supported_features |= support
         self._attr_supported_features &= SUPPORT_GROUP_LIGHT
 
-        self._attr_extra_state_attributes = self._build_extra_state_attributes(
-            snapshot
-        )
+        self._attr_extra_state_attributes = {ATTR_ENTITY_ID: self._entity_ids}
         return True

@@ -8,6 +8,7 @@ from typing import Any, cast
 import voluptuous as vol
 
 from homeassistant.components import websocket_api
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_ENTITIES
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
@@ -21,30 +22,85 @@ from homeassistant.helpers.schema_config_entry_flow import (
     entity_selector_without_own_entities,
 )
 
-from .const import (
-    BRIGHTNESS_STRATEGIES,
-    CONF_ALL,
-    CONF_BRIGHTNESS_STRATEGY,
-    CONF_HIDE_MEMBERS,
-    CONF_MEMBER_DIAGNOSTICS,
-    CONF_REMEMBER_BRIGHTNESS,
-    CONF_REMEMBER_ON_STATE,
-    CONF_RESTORE_INDIVIDUAL_BRIGHTNESS,
-    CONF_DEBOUNCE_ENABLED,
-    CONF_DEBOUNCE_TIME,
-    DEFAULT_BRIGHTNESS_STRATEGY,
-    DEFAULT_DEBOUNCE_ENABLED,
-    DEFAULT_DEBOUNCE_TIME,
-    DEFAULT_MEMBER_DIAGNOSTICS,
-    DOMAIN,
-)
+from .const import DOMAIN
 from .entity import GroupEntity
 from .light import async_create_preview_light
-from .services import validate_member_entities
-from .visibility import (
-    restore_member_visibility_if_hidden_by_integration,
-    set_member_visibility,
-)
+
+LIGHT_DOMAIN = "light"
+
+
+@callback
+def _entity_relative_light_group_entry(
+    hass: HomeAssistant, entity_id: str
+) -> ConfigEntry | None:
+    """Return the relative_light_group config entry that owns the entity, if any."""
+    registry = er.async_get(hass)
+    reg_entry = registry.async_get(entity_id)
+    if reg_entry is None or reg_entry.config_entry_id is None:
+        return None
+    config_entry = hass.config_entries.async_get_entry(reg_entry.config_entry_id)
+    if config_entry is None or config_entry.domain != DOMAIN:
+        return None
+    return config_entry
+
+
+@callback
+def validate_member_entities(
+    hass: HomeAssistant,
+    entity_ids: list[Any],
+    own_entity_ids: set[str] | None = None,
+) -> list[str]:
+    """Validate proposed member entity_ids."""
+    own = own_entity_ids or set()
+    seen: set[str] = set()
+    deduped: list[str] = []
+
+    for raw in entity_ids:
+        if not isinstance(raw, str) or not raw:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="invalid_entity",
+                translation_placeholders={"entity_id": str(raw)},
+            )
+        eid = raw
+        if eid in seen:
+            continue
+        seen.add(eid)
+
+        domain, _, _ = eid.partition(".")
+        if domain != LIGHT_DOMAIN:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="invalid_domain",
+                translation_placeholders={"entity_id": eid},
+            )
+
+        if eid in own:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="self_reference",
+                translation_placeholders={"entity_id": eid},
+            )
+
+        registry = er.async_get(hass)
+        if registry.async_get(eid) is None and hass.states.get(eid) is None:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="unknown_entity",
+                translation_placeholders={"entity_id": eid},
+            )
+
+        if _entity_relative_light_group_entry(hass, eid) is not None:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="nested_relative_group",
+                translation_placeholders={"entity_id": eid},
+            )
+
+        deduped.append(eid)
+
+    return deduped
+
 
 
 def light_config_schema() -> vol.Schema:
@@ -56,42 +112,6 @@ def light_config_schema() -> vol.Schema:
                 selector.EntitySelectorConfig(
                     domain="light", multiple=True, reorder=True
                 ),
-            ),
-            vol.Required(CONF_ALL, default=False): selector.BooleanSelector(),
-            vol.Required(CONF_HIDE_MEMBERS, default=False): selector.BooleanSelector(),
-            vol.Required(
-                CONF_REMEMBER_ON_STATE, default=False
-            ): selector.BooleanSelector(),
-            vol.Required(
-                CONF_RESTORE_INDIVIDUAL_BRIGHTNESS, default=False
-            ): selector.BooleanSelector(),
-            vol.Required(
-                CONF_REMEMBER_BRIGHTNESS, default=False
-            ): selector.BooleanSelector(),
-            vol.Required(
-                CONF_BRIGHTNESS_STRATEGY, default=DEFAULT_BRIGHTNESS_STRATEGY
-            ): selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=list(BRIGHTNESS_STRATEGIES),
-                    translation_key=CONF_BRIGHTNESS_STRATEGY,
-                )
-            ),
-            vol.Required(
-                CONF_MEMBER_DIAGNOSTICS, default=DEFAULT_MEMBER_DIAGNOSTICS
-            ): selector.BooleanSelector(),
-            vol.Required(
-                CONF_DEBOUNCE_ENABLED, default=DEFAULT_DEBOUNCE_ENABLED
-            ): selector.BooleanSelector(),
-            vol.Required(
-                CONF_DEBOUNCE_TIME, default=DEFAULT_DEBOUNCE_TIME
-            ): selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=0,
-                    max=10000,
-                    step=100,
-                    mode=selector.NumberSelectorMode.BOX,
-                    unit_of_measurement="ms",
-                )
             ),
         }
     )
@@ -117,42 +137,6 @@ async def light_options_schema(
     return vol.Schema(
         {
             vol.Required(CONF_ENTITIES): entity_selector_field,
-            vol.Required(CONF_ALL, default=False): selector.BooleanSelector(),
-            vol.Required(CONF_HIDE_MEMBERS, default=False): selector.BooleanSelector(),
-            vol.Required(
-                CONF_REMEMBER_ON_STATE, default=False
-            ): selector.BooleanSelector(),
-            vol.Required(
-                CONF_RESTORE_INDIVIDUAL_BRIGHTNESS, default=False
-            ): selector.BooleanSelector(),
-            vol.Required(
-                CONF_REMEMBER_BRIGHTNESS, default=False
-            ): selector.BooleanSelector(),
-            vol.Required(
-                CONF_BRIGHTNESS_STRATEGY, default=DEFAULT_BRIGHTNESS_STRATEGY
-            ): selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=list(BRIGHTNESS_STRATEGIES),
-                    translation_key=CONF_BRIGHTNESS_STRATEGY,
-                )
-            ),
-            vol.Required(
-                CONF_MEMBER_DIAGNOSTICS, default=DEFAULT_MEMBER_DIAGNOSTICS
-            ): selector.BooleanSelector(),
-            vol.Required(
-                CONF_DEBOUNCE_ENABLED, default=DEFAULT_DEBOUNCE_ENABLED
-            ): selector.BooleanSelector(),
-            vol.Required(
-                CONF_DEBOUNCE_TIME, default=DEFAULT_DEBOUNCE_TIME
-            ): selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=0,
-                    max=10000,
-                    step=100,
-                    mode=selector.NumberSelectorMode.BOX,
-                    unit_of_measurement="ms",
-                )
-            ),
         }
     )
 
@@ -163,11 +147,7 @@ LIGHT_CONFIG_SCHEMA = light_config_schema()
 async def _async_validate_entities(
     handler: SchemaCommonFlowHandler, user_input: dict[str, Any]
 ) -> dict[str, Any]:
-    """Reject members with invalid domain, self-references or nested groups.
-
-    Runs after the schema validates types/format. Maps validation errors to
-    `SchemaFlowError` so the form re-renders with a localized error.
-    """
+    """Reject members with invalid domain, self-references or nested groups."""
     entities = user_input.get(CONF_ENTITIES, [])
 
     hass = handler.parent_handler.hass
@@ -191,12 +171,6 @@ async def _async_validate_entities(
 
     if not validated:
         raise SchemaFlowError("empty_group")
-
-    brightness_strategy = user_input.get(
-        CONF_BRIGHTNESS_STRATEGY, DEFAULT_BRIGHTNESS_STRATEGY
-    )
-    if brightness_strategy not in BRIGHTNESS_STRATEGIES:
-        raise SchemaFlowError("invalid_brightness_strategy")
 
     user_input[CONF_ENTITIES] = validated
     return user_input
@@ -239,26 +213,6 @@ class RelativeLightGroupConfigFlowHandler(SchemaConfigFlowHandler, domain=DOMAIN
     def async_config_entry_title(self, options: Mapping[str, Any]) -> str:
         """Return config entry title."""
         return cast(str, options["name"]) if "name" in options else ""
-
-    @callback
-    def async_config_flow_finished(self, options: Mapping[str, Any]) -> None:
-        """Hide the group members if requested."""
-        if options.get(CONF_HIDE_MEMBERS, False):
-            set_member_visibility(
-                self.hass, options[CONF_ENTITIES], er.RegistryEntryHider.INTEGRATION
-            )
-
-    @callback
-    @staticmethod
-    def async_options_flow_finished(
-        hass: HomeAssistant, options: Mapping[str, Any]
-    ) -> None:
-        """Hide or unhide the group members as requested."""
-        members = list(options[CONF_ENTITIES])
-        if options.get(CONF_HIDE_MEMBERS, False):
-            set_member_visibility(hass, members, er.RegistryEntryHider.INTEGRATION)
-        else:
-            restore_member_visibility_if_hidden_by_integration(hass, members)
 
     @staticmethod
     async def async_setup_preview(hass: HomeAssistant) -> None:

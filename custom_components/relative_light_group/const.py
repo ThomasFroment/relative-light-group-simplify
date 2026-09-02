@@ -4,29 +4,12 @@ from __future__ import annotations
 
 DOMAIN = "relative_light_group"
 
-CONF_HIDE_MEMBERS = "hide_members"
-CONF_ALL = "all"
-CONF_REMEMBER_ON_STATE = "remember_on_state"
-CONF_RESTORE_INDIVIDUAL_BRIGHTNESS = "restore_individual_brightness"
-CONF_REMEMBER_BRIGHTNESS = "remember_brightness"
-CONF_DEBOUNCE_ENABLED = "debounce_enabled"
-CONF_DEBOUNCE_TIME = "debounce_time"
-CONF_BRIGHTNESS_STRATEGY = "brightness_strategy"
-CONF_MEMBER_DIAGNOSTICS = "member_diagnostics"
+# Easy 1-line toggles for personal preferences:
+DEFAULT_REMEMBER_ON_STATE = False  # Set to True to only turn on previously active lights
+DEFAULT_RESTORE_INDIVIDUAL_BRIGHTNESS = False  # Set to True to restore previous brightness levels per lamp
 
-BRIGHTNESS_STRATEGY_AVERAGE = "average"
-BRIGHTNESS_STRATEGY_MEDIAN = "median"
-BRIGHTNESS_STRATEGY_MAX = "max"
-BRIGHTNESS_STRATEGY_MIN = "min"
-
-BRIGHTNESS_STRATEGIES = (
-    BRIGHTNESS_STRATEGY_AVERAGE,
-    BRIGHTNESS_STRATEGY_MEDIAN,
-    BRIGHTNESS_STRATEGY_MAX,
-    BRIGHTNESS_STRATEGY_MIN,
-)
-
+# Core behaviors hardcoded for optimal personal use:
+DEFAULT_REMEMBER_BRIGHTNESS = True  # Preserve proportional ratios even across limits (0% or 100%)
 DEFAULT_DEBOUNCE_ENABLED = True
-DEFAULT_DEBOUNCE_TIME = 2000
-DEFAULT_BRIGHTNESS_STRATEGY = BRIGHTNESS_STRATEGY_AVERAGE
-DEFAULT_MEMBER_DIAGNOSTICS = False
+DEFAULT_DEBOUNCE_TIME = 2000  # ms
+
