@@ -931,19 +931,27 @@ class RelativeLightGroup(GroupEntity, LightEntity):
         self._seed_runtime_state_from_members(snapshot)
 
         # Update base brightness from external changes only.
-        # Check each light's state context to see if it was driven by a group command.
+        # Check each light state context to see if it was driven by a group command.
         if self._remember_brightness:
+            external_change = False
             for state in on_states:
-                # Only external changes should redefine the remembered brightness base.
                 if not self._context_belongs_to_group_command(state.context):
+                    external_change = True
+                    break
+
+            if external_change:
+                # To maintain relative brightness integrity, if any single light is changed
+                # externally, we must capture the current state of *all* lights in the group
+                # as the new ratio baseline.
+                for state in on_states:
                     brightness = state.attributes.get(ATTR_BRIGHTNESS)
                     if brightness is not None:
                         self._base_brightness[state.entity_id] = int(brightness)
-                        _LOGGER.debug(
-                            "Updated external base brightness for %s: %s",
-                            state.entity_id,
-                            brightness,
-                        )
+                _LOGGER.debug(
+                    "External brightness change detected for %s. New baseline saved: %s",
+                    self.entity_id,
+                    self._base_brightness,
+                )
 
         self._attr_hs_color = reduce_attribute(
             on_states, ATTR_HS_COLOR, reduce=mean_circle
