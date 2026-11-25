@@ -172,15 +172,6 @@ def async_create_preview_light(
 
 
 class RelativeLightGroup(GroupEntity, LightEntity):
-    """Representation of a relative light group.
-
-    Brightness changes are distributed proportionally among on lights.
-    Color/effect changes are forwarded only to on lights.
-    Turn on/off affects all lights.
-    The brightness ratio is kept at the limits and replaced when a member is
-    changed outside the group.
-    """
-
     _attr_available = False
     _attr_max_color_temp_kelvin = 6500
     _attr_min_color_temp_kelvin = 2000
@@ -533,14 +524,6 @@ class RelativeLightGroup(GroupEntity, LightEntity):
             raise results[0]
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        """Forward the turn_on command with relative brightness control.
-
-        Behavior:
-        - If the group is OFF (being turned on): turn on all enabled lights.
-          An explicit brightness sets every light to it and replaces the ratio.
-        - If brightness is changing: scale on lights from the remembered ratio.
-        - If color/effect is changing: only apply to on lights.
-        """
         data = {
             key: value for key, value in kwargs.items() if key in FORWARDED_ATTRIBUTES
         }

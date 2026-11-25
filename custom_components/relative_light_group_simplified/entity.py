@@ -77,7 +77,6 @@ class GroupEntity(Entity):
 
     @callback
     def async_defer_or_update_ha_state(self) -> None:
-        """Refresh derived state from members and write it."""
         if not self.hass.is_running:
             return
 
@@ -95,7 +94,7 @@ class GroupEntity(Entity):
     @abstractmethod
     @callback
     def async_update_group_state(self) -> None:
-        """Refresh state from member entities."""
+        ...
 
     @callback
     def async_member_state_changed(self, event: Event[EventStateChangedData]) -> None:
