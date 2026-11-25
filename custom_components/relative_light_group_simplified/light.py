@@ -348,13 +348,6 @@ class RelativeLightGroup(GroupEntity, LightEntity):
         self._last_command_time = now
 
     @callback
-    def _async_sync_group_state(self) -> None:
-        if not self.hass.is_running:
-            return
-        self.async_update_group_state()
-        self.async_write_ha_state()
-
-    @callback
     def _async_write_optimistic_state(self) -> None:
         """Publish the optimistic group state immediately."""
         if self.hass.is_running:

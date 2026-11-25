@@ -60,7 +60,7 @@ class GroupEntity(Entity):
             self.async_member_state_changed(event)
             if self.async_should_defer_state_change(event):
                 return
-            self.async_defer_or_update_ha_state()
+            self._async_sync_group_state()
 
         self.async_on_remove(
             async_track_state_change_event(
@@ -72,11 +72,10 @@ class GroupEntity(Entity):
     @callback
     def _update_at_start(self, _: HomeAssistant) -> None:
         """Update the group state at start."""
-        self.async_update_group_state()
-        self.async_write_ha_state()
+        self._async_sync_group_state()
 
     @callback
-    def async_defer_or_update_ha_state(self) -> None:
+    def _async_sync_group_state(self) -> None:
         if not self.hass.is_running:
             return
 
