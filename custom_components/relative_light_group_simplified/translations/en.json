@@ -11,13 +11,12 @@
       }
     },
     "error": {
-      "invalid_entity": "Invalid entity reference: {entity_id}.",
-      "invalid_domain": "{entity_id} is not a light entity. Only entities from the 'light' domain are allowed.",
-      "self_reference": "{entity_id} cannot be a member of itself.",
-      "unknown_entity": "{entity_id} does not exist.",
-      "nested_relative_group": "{entity_id} belongs to another Relative Light Group; nesting is not supported.",
-      "empty_group": "The group must contain at least one light.",
-      "invalid_entities": "One or more selected entities are invalid."
+      "invalid_entity": "One of the selected entities is not a valid entity reference.",
+      "invalid_domain": "Only light entities can be added to the group.",
+      "self_reference": "A group cannot contain itself.",
+      "unknown_entity": "One of the selected lights does not exist.",
+      "nested_relative_group": "A Relative Light Group Simplified cannot contain another one.",
+      "empty_group": "The group must contain at least one light."
     }
   },
   "options": {
@@ -29,13 +28,12 @@
       }
     },
     "error": {
-      "invalid_entity": "Invalid entity reference: {entity_id}.",
-      "invalid_domain": "{entity_id} is not a light entity. Only entities from the 'light' domain are allowed.",
-      "self_reference": "{entity_id} cannot be a member of itself.",
-      "unknown_entity": "{entity_id} does not exist.",
-      "nested_relative_group": "{entity_id} belongs to another Relative Light Group; nesting is not supported.",
-      "empty_group": "The group must contain at least one light.",
-      "invalid_entities": "One or more selected entities are invalid."
+      "invalid_entity": "One of the selected entities is not a valid entity reference.",
+      "invalid_domain": "Only light entities can be added to the group.",
+      "self_reference": "A group cannot contain itself.",
+      "unknown_entity": "One of the selected lights does not exist.",
+      "nested_relative_group": "A Relative Light Group Simplified cannot contain another one.",
+      "empty_group": "The group must contain at least one light."
     }
   }
 }

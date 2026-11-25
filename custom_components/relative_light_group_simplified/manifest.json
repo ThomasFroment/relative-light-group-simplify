@@ -3,8 +3,9 @@
   "name": "Relative Light Group Simplified",
   "codeowners": ["@ThomasFroment"],
   "config_flow": true,
-  "documentation": "https://github.com/ThomasFroment/relative-light-group-simplify.git",
+  "documentation": "https://github.com/ThomasFroment/relative-light-group-simplify",
   "integration_type": "helper",
   "iot_class": "calculated",
+  "issue_tracker": "https://github.com/ThomasFroment/relative-light-group-simplify/issues",
   "version": "1.0.0"
 }

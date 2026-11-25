@@ -1,0 +1,4 @@
+[lint.isort]
+force-sort-within-sections = true
+combine-as-imports = true
+known-first-party = ["homeassistant"]
