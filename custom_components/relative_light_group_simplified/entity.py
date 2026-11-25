@@ -99,4 +99,4 @@ class GroupEntity(Entity):
 
     @callback
     def async_member_state_changed(self, event: Event[EventStateChangedData]) -> None:
-        """Handle a member state change before the group state is refreshed."""
+        pass
