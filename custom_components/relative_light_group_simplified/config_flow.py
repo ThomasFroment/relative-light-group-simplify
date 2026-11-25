@@ -11,7 +11,7 @@ from homeassistant.components import websocket_api
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_ENTITIES
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er, selector
 from homeassistant.helpers.schema_config_entry_flow import (
     SchemaCommonFlowHandler,
@@ -52,16 +52,13 @@ def validate_member_entities(
 ) -> list[str]:
     """Validate proposed member entity_ids."""
     own = own_entity_ids or set()
+    registry = er.async_get(hass)
     seen: set[str] = set()
     deduped: list[str] = []
 
     for raw in entity_ids:
         if not isinstance(raw, str) or not raw:
-            raise ServiceValidationError(
-                translation_domain=DOMAIN,
-                translation_key="invalid_entity",
-                translation_placeholders={"entity_id": str(raw)},
-            )
+            raise SchemaFlowError("invalid_entity")
         eid = raw
         if eid in seen:
             continue
@@ -69,38 +66,20 @@ def validate_member_entities(
 
         domain, _, _ = eid.partition(".")
         if domain != LIGHT_DOMAIN:
-            raise ServiceValidationError(
-                translation_domain=DOMAIN,
-                translation_key="invalid_domain",
-                translation_placeholders={"entity_id": eid},
-            )
+            raise SchemaFlowError("invalid_domain")
 
         if eid in own:
-            raise ServiceValidationError(
-                translation_domain=DOMAIN,
-                translation_key="self_reference",
-                translation_placeholders={"entity_id": eid},
-            )
+            raise SchemaFlowError("self_reference")
 
-        registry = er.async_get(hass)
         if registry.async_get(eid) is None and hass.states.get(eid) is None:
-            raise ServiceValidationError(
-                translation_domain=DOMAIN,
-                translation_key="unknown_entity",
-                translation_placeholders={"entity_id": eid},
-            )
+            raise SchemaFlowError("unknown_entity")
 
         if _entity_relative_light_group_entry(hass, eid) is not None:
-            raise ServiceValidationError(
-                translation_domain=DOMAIN,
-                translation_key="nested_relative_group",
-                translation_placeholders={"entity_id": eid},
-            )
+            raise SchemaFlowError("nested_relative_group")
 
         deduped.append(eid)
 
     return deduped
-
 
 
 def light_config_schema() -> vol.Schema:
@@ -162,12 +141,7 @@ async def _async_validate_entities(
             )
         }
 
-    try:
-        validated = validate_member_entities(
-            hass, list(entities), own_entity_ids
-        )
-    except ServiceValidationError as err:
-        raise SchemaFlowError(err.translation_key or "invalid_entities") from err
+    validated = validate_member_entities(hass, list(entities), own_entity_ids)
 
     if not validated:
         raise SchemaFlowError("empty_group")

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator
-from itertools import groupby
 from math import atan2, cos, degrees, radians, sin
 from typing import Any
 

@@ -95,16 +95,6 @@ After a restart, the lamps' current levels become the new ratio.
 There is nothing to configure in the UI.
 If you want to change a default, edit `custom_components/relative_light_group_simplified/const.py`, for example `DEFAULT_DEBOUNCE_TIME` (2000 ms) for the no-jumping window.
 
-## Known issues
-
-The current code does not yet fully match the behaviour above:
-
-- **The ratio is sometimes forgotten** after the group reaches 100 % or after the group is turned off and on again.
-  This happens when the group contains an on/off-only lamp that is on, or a lamp that was already at the level the group asked for.
-- **Turning on from off with a brightness keeps the old ratio** instead of replacing it, so the next slider move spreads the lamps apart again.
-- **Lamps are updated one after another** instead of at the same time.
-- Some configuration error messages show "Translation Error" instead of the real message.
-
 ## Credits
 
 Based on [Relative Light Group](https://github.com/Cheerpipe/ha-relative-light-group) by Felipe Urzúa, released under the MIT licence, which is itself built on the Home Assistant `group` integration.
